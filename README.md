@@ -15,7 +15,7 @@ Starting with the latest [Tachiyomi version](https://tachiyomi.org/download/) (v
 
 1. Update to the latest version of [Tachiyomi](https://tachiyomi.org/download/)
 2. Go to Settings > Browse > Extension repos > Add
-3. Enter the following URL and accept: `https://raw.githubusercontent.com/ThePBone/tachiyomi-extensions-revived/repo/index.min.json`
+3. Enter the following URL and accept: `https://raw.githubusercontent.com/Kholbi/tachiyomi-extensions-revived/repo/index.min.json`
 4. Go to the extension management screen, refresh it, and you can now download the removed extensions.
 5. After installing an extension, you need to approve it by tapping on the 'Trust' button.
 
