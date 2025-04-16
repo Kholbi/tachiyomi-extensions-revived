@@ -1,16 +1,12 @@
+// Extension source for BacaKomik in Tachiyomi
 package eu.kanade.tachiyomi.revived.id.bacakomik
 
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.interceptor.rateLimit
-import eu.kanade.tachiyomi.source.model.Filter
-import eu.kanade.tachiyomi.source.model.FilterList
-import eu.kanade.tachiyomi.source.model.Page
-import eu.kanade.tachiyomi.source.model.SChapter
-import eu.kanade.tachiyomi.source.model.SManga
+import eu.kanade.tachiyomi.source.model.*
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
+import java.util.*
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -23,15 +19,12 @@ class BacaKomik : ParsedHttpSource() {
     override val baseUrl = "https://bacakomik.net"
     override val lang = "id"
     override val supportsLatest = true
-    private val dateFormat: SimpleDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
+    private val dateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
 
-    // similar/modified theme of "https://komikindo.id"
-
-    // Formerly "Bacakomik" -> now "BacaKomik"
     override val id = 4383360263234319058
 
     override val client: OkHttpClient = network.cloudflareClient.newBuilder()
-        .rateLimit(12, 3)
+        .rateLimit(12, 3) // Batasi 12 request per 3 detik
         .build()
 
     override fun popularMangaRequest(page: Int): Request {
@@ -58,7 +51,6 @@ class BacaKomik : ParsedHttpSource() {
         manga.setUrlWithoutDomain(element.select("div.animposx > a").first()!!.attr("href"))
         manga.title = element.select(".animposx .tt h4").text()
         manga.thumbnail_url = element.select("div.limit img").imgAttr()
-
         return manga
     }
 
@@ -67,14 +59,11 @@ class BacaKomik : ParsedHttpSource() {
         val url = builtUrl.toHttpUrlOrNull()!!.newBuilder()
         url.addQueryParameter("title", query)
         url.addQueryParameter("page", page.toString())
+
         filters.forEach { filter ->
             when (filter) {
-                is AuthorFilter -> {
-                    url.addQueryParameter("author", filter.state)
-                }
-                is YearFilter -> {
-                    url.addQueryParameter("yearx", filter.state)
-                }
+                is AuthorFilter -> url.addQueryParameter("author", filter.state)
+                is YearFilter -> url.addQueryParameter("yearx", filter.state)
                 is StatusFilter -> {
                     val status = when (filter.state) {
                         Filter.TriState.STATE_INCLUDE -> "completed"
@@ -83,35 +72,32 @@ class BacaKomik : ParsedHttpSource() {
                     }
                     url.addQueryParameter("status", status)
                 }
-                is TypeFilter -> {
-                    url.addQueryParameter("type", filter.toUriPart())
-                }
-                is SortByFilter -> {
-                    url.addQueryParameter("order", filter.toUriPart())
-                }
+                is TypeFilter -> url.addQueryParameter("type", filter.toUriPart())
+                is SortByFilter -> url.addQueryParameter("order", filter.toUriPart())
                 is GenreListFilter -> {
-                    filter.state
-                        .filter { it.state != Filter.TriState.STATE_IGNORE }
+                    filter.state.filter { it.state != Filter.TriState.STATE_IGNORE }
                         .forEach { url.addQueryParameter("genre[]", it.id) }
                 }
-                else -> {}
             }
         }
+
         return GET(url.build().toString(), headers)
     }
+
     override fun mangaDetailsParse(document: Document): SManga {
         val infoElement = document.select("div.infoanime").first()!!
         val descElement = document.select("div.desc > .entry-content.entry-content-single").first()!!
+
         val manga = SManga.create()
         manga.title = document.select("#breadcrumbs li:last-child span").text()
         manga.author = document.select(".infox .spe span:contains(Author) :not(b)").text()
         manga.artist = document.select(".infox .spe span:contains(Artis) :not(b)").text()
+
         val genres = mutableListOf<String>()
-        infoElement.select(".infox > .genre-info > a, .infox .spe span:contains(Jenis Komik) a").forEach { element ->
-            val genre = element.text()
-            genres.add(genre)
-        }
+        infoElement.select(".infox > .genre-info > a, .infox .spe span:contains(Jenis Komik) a")
+            .forEach { genres.add(it.text()) }
         manga.genre = genres.joinToString(", ")
+
         manga.status = parseStatus(document.select(".infox .spe span:contains(Status)").text())
         manga.description = descElement.select("p").text().substringAfter("bercerita tentang ")
         manga.thumbnail_url = document.select(".thumb > img:nth-child(1)").imgAttr()
@@ -137,32 +123,16 @@ class BacaKomik : ParsedHttpSource() {
 
     private fun parseChapterDate(date: String): Long {
         return if (date.contains("yang lalu")) {
-            val value = date.split(' ')[0].toInt()
+            val value = date.split(' ')[0].toIntOrNull() ?: return 0L
             when {
-                "detik" in date -> Calendar.getInstance().apply {
-                    add(Calendar.SECOND, value * -1)
-                }.timeInMillis
-                "menit" in date -> Calendar.getInstance().apply {
-                    add(Calendar.MINUTE, value * -1)
-                }.timeInMillis
-                "jam" in date -> Calendar.getInstance().apply {
-                    add(Calendar.HOUR_OF_DAY, value * -1)
-                }.timeInMillis
-                "hari" in date -> Calendar.getInstance().apply {
-                    add(Calendar.DATE, value * -1)
-                }.timeInMillis
-                "minggu" in date -> Calendar.getInstance().apply {
-                    add(Calendar.DATE, value * 7 * -1)
-                }.timeInMillis
-                "bulan" in date -> Calendar.getInstance().apply {
-                    add(Calendar.MONTH, value * -1)
-                }.timeInMillis
-                "tahun" in date -> Calendar.getInstance().apply {
-                    add(Calendar.YEAR, value * -1)
-                }.timeInMillis
-                else -> {
-                    0L
-                }
+                "detik" in date -> Calendar.getInstance().apply { add(Calendar.SECOND, -value) }.timeInMillis
+                "menit" in date -> Calendar.getInstance().apply { add(Calendar.MINUTE, -value) }.timeInMillis
+                "jam" in date -> Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, -value) }.timeInMillis
+                "hari" in date -> Calendar.getInstance().apply { add(Calendar.DATE, -value) }.timeInMillis
+                "minggu" in date -> Calendar.getInstance().apply { add(Calendar.DATE, -value * 7) }.timeInMillis
+                "bulan" in date -> Calendar.getInstance().apply { add(Calendar.MONTH, -value) }.timeInMillis
+                "tahun" in date -> Calendar.getInstance().apply { add(Calendar.YEAR, -value) }.timeInMillis
+                else -> 0L
             }
         } else {
             try {
@@ -174,12 +144,10 @@ class BacaKomik : ParsedHttpSource() {
     }
 
     override fun prepareNewChapter(chapter: SChapter, manga: SManga) {
-        val basic = Regex("""Chapter\s([0-9]+)""")
-        when {
-            basic.containsMatchIn(chapter.name) -> {
-                basic.find(chapter.name)?.let {
-                    chapter.chapter_number = it.groups[1]?.value!!.toFloat()
-                }
+        val basic = Regex("""Chapter\\s([0-9]+)""")
+        if (basic.containsMatchIn(chapter.name)) {
+            basic.find(chapter.name)?.let {
+                chapter.chapter_number = it.groups[1]?.value!!.toFloat()
             }
         }
     }
@@ -187,16 +155,15 @@ class BacaKomik : ParsedHttpSource() {
     override fun pageListParse(document: Document): List<Page> {
         val pages = mutableListOf<Page>()
         var i = 0
-        document.select("div:has(>img[alt*=\"Chapter\"]) img").filter { element ->
-            val parent = element.parent()
-            parent != null && parent.tagName() != "noscript"
-        }.forEach { element ->
-            val url = element.attr("onError").substringAfter("src='").substringBefore("';")
-            i++
-            if (url.isNotEmpty()) {
-                pages.add(Page(i, "", url))
+        document.select("div:has(>img[alt*=\"Chapter\"]) img")
+            .filter { it.parent()?.tagName() != "noscript" }
+            .forEach {
+                val url = it.attr("onError").substringAfter("src='").substringBefore("';")
+                i++
+                if (url.isNotEmpty()) {
+                    pages.add(Page(i, "", url))
+                }
             }
-        }
         return pages
     }
 
@@ -207,45 +174,34 @@ class BacaKomik : ParsedHttpSource() {
             .set("Accept", "image/avif,image/webp,image/png,image/jpeg,*/*")
             .set("Referer", page.url)
             .build()
-
         return GET(page.imageUrl!!, newHeaders)
     }
 
     private class AuthorFilter : Filter.Text("Author")
-
     private class YearFilter : Filter.Text("Year")
 
-    private class TypeFilter : UriPartFilter(
-        "Type",
-        arrayOf(
-            Pair("Default", ""),
-            Pair("Manga", "Manga"),
-            Pair("Manhwa", "Manhwa"),
-            Pair("Manhua", "Manhua"),
-            Pair("Comic", "Comic"),
-        ),
-    )
+    private class TypeFilter : UriPartFilter("Type", arrayOf(
+        Pair("Default", ""),
+        Pair("Manga", "Manga"),
+        Pair("Manhwa", "Manhwa"),
+        Pair("Manhua", "Manhua"),
+        Pair("Comic", "Comic"),
+    ))
 
-    private class SortByFilter : UriPartFilter(
-        "Sort By",
-        arrayOf(
-            Pair("Default", ""),
-            Pair("A-Z", "title"),
-            Pair("Z-A", "titlereverse"),
-            Pair("Latest Update", "update"),
-            Pair("Latest Added", "latest"),
-            Pair("Popular", "popular"),
-        ),
-    )
+    private class SortByFilter : UriPartFilter("Sort By", arrayOf(
+        Pair("Default", ""),
+        Pair("A-Z", "title"),
+        Pair("Z-A", "titlereverse"),
+        Pair("Latest Update", "update"),
+        Pair("Latest Added", "latest"),
+        Pair("Popular", "popular"),
+    ))
 
-    private class StatusFilter : UriPartFilter(
-        "Status",
-        arrayOf(
-            Pair("All", ""),
-            Pair("Ongoing", "ongoing"),
-            Pair("Completed", "completed"),
-        ),
-    )
+    private class StatusFilter : UriPartFilter("Status", arrayOf(
+        Pair("All", ""),
+        Pair("Ongoing", "ongoing"),
+        Pair("Completed", "completed"),
+    ))
 
     private class Genre(name: String, val id: String = name) : Filter.TriState(name)
     private class GenreListFilter(genres: List<Genre>) : Filter.Group<Genre>("Genre", genres)
