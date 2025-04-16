@@ -8,4 +8,12 @@ ext {
     extVersionCode = 11
 }
 
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' } // ← ini penting
+    }
+}
+
 apply from: "$rootDir/common.gradle"

@@ -12,11 +12,11 @@ buildscript {
     }
 }
 
-dependencyResolutionManagement {
+allprojects {
     repositories {
-        google()
         mavenCentral()
-        maven("https://jitpack.io")
+        google()
+        maven(url = "https://jitpack.io")
     }
 }
 
