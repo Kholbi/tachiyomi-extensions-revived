@@ -15,7 +15,9 @@ android {
 }
 
 repositories {
+    google()
     mavenCentral()
+    maven(url = "https://jitpack.io") // ini penting!
 }
 
 dependencies {
