@@ -22,5 +22,5 @@ repositories {
 
 dependencies {
     compileOnly(libs.bundles.common)
-    compileOnly "com.github.mihonapp:extensions-lib:$libVersion"
+    compileOnly("com.github.mihonapp:extensions-lib:$libVersion")
 }
