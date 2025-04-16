@@ -13,6 +13,8 @@ import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
+import uy.kohesive.injekt.*
+import uy.kohesive.injekt.api.*
 
 class BacaKomik : ParsedHttpSource() {
     override val name = "BacaKomik"
